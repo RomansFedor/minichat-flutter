@@ -3,12 +3,27 @@
 ## 🎯 ЩО ПОТРІБНО ЗРОБИТИ
 
 ### 1️⃣ GitHub (5 хвилин)
-1. Створіть репозиторій на GitHub
-2. Підключіть локальний Git:
+
+**ВАЖЛИВО:** Спочатку створіть репозиторій на GitHub!
+
+1. **Створіть репозиторій на GitHub:**
+   - Перейдіть на https://github.com/new
+   - **Repository name:** `minichat-flutter`
+   - **Description:** `MiniChat - Flutter chat application`
+   - **Visibility:** Public або Private
+   - ❌ **НЕ створюйте README, .gitignore, або license** (вони вже є локально)
+   - Натисніть **"Create repository"**
+
+2. **Підключіть локальний Git:**
    ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/minichat-flutter.git
+   git remote add origin https://github.com/RomansFedor/minichat-flutter.git
    git push -u origin main
    ```
+
+   ⚠️ **Якщо отримуєте помилку "Repository not found":**
+   - Перевірте, що репозиторій створено на GitHub
+   - Перевірте правильність URL (ваш username: `RomansFedor`)
+   - Переконайтесь, що ви авторизовані на GitHub
 
 ### 2️⃣ Bitrise (10 хвилин)
 1. Зареєструйтесь на https://www.bitrise.io (через GitHub)
