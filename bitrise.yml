@@ -16,24 +16,87 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
-    - flutter-installer@0:
     - script@1:
-        title: "Ensure Flutter/Dart version compatibility"
+        title: "Install Flutter with correct Dart version"
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "Checking Flutter and Dart versions..."
+            echo "=========================================="
+            echo "Installing latest Flutter stable..."
+            echo "=========================================="
+            
+            # Install Flutter if not already installed
+            if ! command -v flutter &> /dev/null; then
+              echo "Flutter not found, installing..."
+              git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter || true
+              export PATH="$HOME/flutter/bin:$PATH"
+            fi
+            
+            # Ensure Flutter is in PATH
+            export PATH="$HOME/flutter/bin:$PATH"
+            
+            echo "Current Flutter version:"
             flutter --version
             dart --version
             
-            # Update Flutter to latest stable to ensure Dart 3.9.2+ compatibility
-            echo "Upgrading Flutter to latest stable version..."
+            echo "=========================================="
+            echo "Upgrading Flutter to latest stable..."
+            echo "=========================================="
             flutter upgrade --force
+            
+            echo "=========================================="
+            echo "Final Flutter/Dart versions:"
+            echo "=========================================="
             flutter --version
             dart --version
-            echo "Flutter upgrade completed"
-    - cache-pull@2: {}
+            
+            # Verify Dart version
+            DART_VER=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            echo "Dart version: $DART_VER"
+            
+            VER_NUM=$(echo "$DART_VER" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+            if [ "$VER_NUM" -lt 30902 ]; then
+              echo "ERROR: Dart version $DART_VER < 3.9.2"
+              exit 1
+            fi
+            
+            echo "✓ Dart version OK: $DART_VER >= 3.9.2"
+            flutter precache --android
+    - cache-pull@2:
+        is_always_run: false
+    - script@1:
+        title: "Get Flutter dependencies"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            echo "Getting Flutter dependencies..."
+            flutter pub get
+            echo "Dependencies installed successfully!"
+    - script@1:
+        title: "Verify Dart SDK version before tests"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "=========================================="
+            echo "Final Dart SDK version check..."
+            echo "=========================================="
+            DART_VERSION=$(dart --version 2>&1 | head -n1)
+            echo "Dart version: $DART_VERSION"
+            
+            # Verify Dart version is 3.9.2 or higher
+            DART_MAJOR_MINOR=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            echo "Dart version parsed: $DART_MAJOR_MINOR"
+            
+            if [[ $(echo "$DART_MAJOR_MINOR" | awk -F. '{print ($1*10000 + $2*100 + $3)}') -lt 30902 ]]; then
+              echo "ERROR: Dart version $DART_MAJOR_MINOR is too old. Need 3.9.2+"
+              exit 1
+            fi
+            
+            echo "Dart version is compatible: $DART_MAJOR_MINOR >= 3.9.2"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
@@ -60,24 +123,87 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
-    - flutter-installer@0:
     - script@1:
-        title: "Ensure Flutter/Dart version compatibility"
+        title: "Install Flutter with correct Dart version"
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "Checking Flutter and Dart versions..."
+            echo "=========================================="
+            echo "Installing latest Flutter stable..."
+            echo "=========================================="
+            
+            # Install Flutter if not already installed
+            if ! command -v flutter &> /dev/null; then
+              echo "Flutter not found, installing..."
+              git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter || true
+              export PATH="$HOME/flutter/bin:$PATH"
+            fi
+            
+            # Ensure Flutter is in PATH
+            export PATH="$HOME/flutter/bin:$PATH"
+            
+            echo "Current Flutter version:"
             flutter --version
             dart --version
             
-            # Update Flutter to latest stable to ensure Dart 3.9.2+ compatibility
-            echo "Upgrading Flutter to latest stable version..."
+            echo "=========================================="
+            echo "Upgrading Flutter to latest stable..."
+            echo "=========================================="
             flutter upgrade --force
+            
+            echo "=========================================="
+            echo "Final Flutter/Dart versions:"
+            echo "=========================================="
             flutter --version
             dart --version
-            echo "Flutter upgrade completed"
-    - cache-pull@2: {}
+            
+            # Verify Dart version
+            DART_VER=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            echo "Dart version: $DART_VER"
+            
+            VER_NUM=$(echo "$DART_VER" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+            if [ "$VER_NUM" -lt 30902 ]; then
+              echo "ERROR: Dart version $DART_VER < 3.9.2"
+              exit 1
+            fi
+            
+            echo "✓ Dart version OK: $DART_VER >= 3.9.2"
+            flutter precache --android
+    - cache-pull@2:
+        is_always_run: false
+    - script@1:
+        title: "Get Flutter dependencies"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            echo "Getting Flutter dependencies..."
+            flutter pub get
+            echo "Dependencies installed successfully!"
+    - script@1:
+        title: "Verify Dart SDK version before tests"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "=========================================="
+            echo "Final Dart SDK version check..."
+            echo "=========================================="
+            DART_VERSION=$(dart --version 2>&1 | head -n1)
+            echo "Dart version: $DART_VERSION"
+            
+            # Verify Dart version is 3.9.2 or higher
+            DART_MAJOR_MINOR=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            echo "Dart version parsed: $DART_MAJOR_MINOR"
+            
+            if [[ $(echo "$DART_MAJOR_MINOR" | awk -F. '{print ($1*10000 + $2*100 + $3)}') -lt 30902 ]]; then
+              echo "ERROR: Dart version $DART_MAJOR_MINOR is too old. Need 3.9.2+"
+              exit 1
+            fi
+            
+            echo "Dart version is compatible: $DART_MAJOR_MINOR >= 3.9.2"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
