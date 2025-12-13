@@ -1,108 +1,97 @@
 format_version: '11'
 default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 
-project_type: flutter
+app:
+  envs:
+  - BITRISE_FLUTTER_PROJECT_DIR: "."
+  - BITRISE_FLUTTER_PROJECT_LOCATION: "."
 
 workflows:
   primary:
+    description: "Primary workflow for building and deploying Flutter Android app"
     steps:
     - activate-ssh-key@4:
         run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
     - git-clone@6: {}
-    - cache-pull@2: {}
-    - flutter-installer@0:
-        inputs:
-        - flutter_version: "3.24.0"
-        - channel: "stable"
-    - flutter-analyze@0: {}
     - install-missing-android-tools@3:
         inputs:
-        - android_home: "$ANDROID_HOME"
-    - android-signing-config@0:
-        run_if: '{{getenv "BITRISEIO_ANDROID_KEYSTORE_URL" | ne ""}}'
+        - gradle_version: "8.0"
+    - flutter-installer@0:
+    - script@1:
+        title: "Ensure Flutter/Dart version compatibility"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "Checking Flutter and Dart versions..."
+            flutter --version
+            dart --version
+            
+            # Update Flutter to latest stable to ensure Dart 3.9.2+ compatibility
+            echo "Upgrading Flutter to latest stable version..."
+            flutter upgrade --force
+            flutter --version
+            dart --version
+            echo "Flutter upgrade completed"
+    - cache-pull@2: {}
+    - flutter-test@0:
+        inputs:
+        - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
     - flutter-build@0:
         inputs:
-        - project_location: "$BITRISE_FLUTTER_PROJECT_LOCATION"
-        - build_arguments: "build apk --release"
-        - target_platform: "android"
-    - sign-apk@1:
-        run_if: '{{getenv "BITRISEIO_ANDROID_KEYSTORE_URL" | ne ""}}'
+        - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
+        - platform: "android"
+        - build_apk: "true"
+        - build_appbundle: "false"
+    - firebase-app-distribution@2:
         inputs:
-        - apk_path: "$BITRISE_FLUTTER_APK_PATH"
-    - firebase-app-distribution@3:
-        run_if: '{{getenv "FIREBASE_SERVICE_ACCOUNT_JSON" | ne ""}}'
-        inputs:
-        - service_credentials_file_path: "$BITRISE_FIREBASE_SERVICE_ACCOUNT_JSON"
-        - app_path: "$BITRISE_FLUTTER_APK_PATH"
-        - groups: "testers"
-        - release_notes: "Build #$BITRISE_BUILD_NUMBER - Automated build from Bitrise"
-    - deploy-to-bitrise-io@2:
-        inputs:
-        - deploy_path: "$BITRISE_FLUTTER_APK_PATH"
+        - firebase_token: "$FIREBASE_TOKEN"
+        - app_path: "$BITRISE_APK_PATH"
+        - groups: "$FIREBASE_GROUPS"
+        - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
 
-  android-build-and-distribute:
-    description: "Build Android APK and distribute via Firebase App Distribution"
+  deploy:
+    description: "Deploy workflow with Firebase App Distribution"
     steps:
     - activate-ssh-key@4:
         run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
     - git-clone@6: {}
-    - cache-pull@2: {}
-    - flutter-installer@0:
-        inputs:
-        - flutter_version: "3.24.0"
-        - channel: "stable"
-    - flutter-analyze@0: {}
-    - flutter-test@0: {}
     - install-missing-android-tools@3:
         inputs:
-        - android_home: "$ANDROID_HOME"
-        - android_sdk_components: "platform-tools,platforms;android-34,build-tools;34.0.0"
-    - android-signing-config@0:
-        run_if: '{{getenv "BITRISEIO_ANDROID_KEYSTORE_URL" | ne ""}}'
+        - gradle_version: "8.0"
+    - flutter-installer@0:
+    - script@1:
+        title: "Ensure Flutter/Dart version compatibility"
         inputs:
-        - keystore_url: "$BITRISEIO_ANDROID_KEYSTORE_URL"
-        - keystore_password: "$BITRISEIO_ANDROID_KEYSTORE_PASSWORD"
-        - keystore_alias: "$BITRISEIO_ANDROID_KEYSTORE_ALIAS"
-        - private_key_password: "$BITRISEIO_ANDROID_KEYSTORE_PRIVATE_KEY_PASSWORD"
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "Checking Flutter and Dart versions..."
+            flutter --version
+            dart --version
+            
+            # Update Flutter to latest stable to ensure Dart 3.9.2+ compatibility
+            echo "Upgrading Flutter to latest stable version..."
+            flutter upgrade --force
+            flutter --version
+            dart --version
+            echo "Flutter upgrade completed"
+    - cache-pull@2: {}
+    - flutter-test@0:
+        inputs:
+        - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
     - flutter-build@0:
         inputs:
-        - project_location: "$BITRISE_FLUTTER_PROJECT_LOCATION"
-        - build_arguments: "build apk --release"
-        - target_platform: "android"
-    - sign-apk@1:
-        run_if: '{{getenv "BITRISEIO_ANDROID_KEYSTORE_URL" | ne ""}}'
+        - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
+        - platform: "android"
+        - build_apk: "true"
+        - build_appbundle: "false"
+    - firebase-app-distribution@2:
         inputs:
-        - apk_path: "$BITRISE_FLUTTER_APK_PATH"
-    - firebase-app-distribution@3:
-        run_if: '{{getenv "FIREBASE_SERVICE_ACCOUNT_JSON" | ne ""}}'
-        inputs:
-        - service_credentials_file_path: "$BITRISE_FIREBASE_SERVICE_ACCOUNT_JSON"
-        - app_path: "$BITRISE_FLUTTER_APK_PATH"
-        - groups: "testers"
-        - release_notes: "Build #$BITRISE_BUILD_NUMBER - Automated build from Bitrise\nCommit: $BITRISE_GIT_COMMIT\nBranch: $BITRISE_GIT_BRANCH"
-    - deploy-to-bitrise-io@2:
-        inputs:
-        - deploy_path: "$BITRISE_FLUTTER_APK_PATH"
+        - firebase_token: "$FIREBASE_TOKEN"
+        - app_path: "$BITRISE_APK_PATH"
+        - groups: "$FIREBASE_GROUPS"
+        - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
-
-  pull-request:
-    description: "Run tests and analyze code for pull requests"
-    steps:
-    - activate-ssh-key@4:
-        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
-    - git-clone@6: {}
-    - cache-pull@2: {}
-    - flutter-installer@0:
-        inputs:
-        - flutter_version: "3.24.0"
-        - channel: "stable"
-    - flutter-analyze@0: {}
-    - flutter-test@0: {}
-    - cache-push@2: {}
-
-app:
-  envs:
-  - BITRISE_FLUTTER_PROJECT_LOCATION: "."
-  - FLUTTER_VERSION: "3.24.0"
 
