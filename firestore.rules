@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Функція для перевірки авторизації
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Функція для перевірки, чи користувач є автором
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // КОЛЕКЦІЯ: chat_rooms
+    // ============================================
+    match /chat_rooms/{chatId} {
+      
+      // Читати можуть тільки авторизовані користувачі
+      allow read: if isAuthenticated();
+      
+      // Створювати можуть тільки авторизовані користувачі
+      allow create: if isAuthenticated() 
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.createdAt == request.time;
+      
+      // Оновлювати можуть тільки ті, хто створив чат (createdBy)
+      allow update: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy; // не можна змінити автора
+      
+      // Видаляти можуть тільки ті, хто створив чат
+      allow delete: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
+      
+      // ============================================
+      // ПІДКОЛЕКЦІЯ: messages
+      // ============================================
+      match /messages/{messageId} {
+        
+        // Читати можуть тільки авторизовані користувачі
+        allow read: if isAuthenticated();
+        
+        // Створювати можуть тільки авторизовані користувачі
+        allow create: if isAuthenticated()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.timestamp == request.time;
+        
+        // Оновлювати можуть тільки відправник повідомлення
+        // Дозволяємо оновлювати тільки поле text та isEdited, editedAt
+        allow update: if isAuthenticated()
+          && resource.data.senderId == request.auth.uid
+          && request.resource.data.senderId == resource.data.senderId // не можна змінити відправника
+          && request.resource.data.timestamp == resource.data.timestamp; // не можна змінити час
+        
+        // Видаляти можуть тільки відправник повідомлення
+        allow delete: if isAuthenticated()
+          && resource.data.senderId == request.auth.uid;
+      }
+    }
+    
+    // ============================================
+    // КОЛЕКЦІЯ: saved_messages
+    // ============================================
+    match /saved_messages/{savedMessageId} {
+      
+      // Читати можуть тільки власники збережених повідомлень
+      allow read: if isAuthenticated() 
+        && resource.data.userId == request.auth.uid;
+      
+      // Створювати можуть тільки авторизовані користувачі для себе
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.messageText is string
+        && request.resource.data.savedAt == request.time;
+      
+      // Оновлювати можуть тільки власники (наприклад, щоб додати примітку)
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId; // не можна змінити власника
+      
+      // Видаляти можуть тільки власники
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+    }
+    
+    // За замовчуванням - заборонено доступ до всіх інших колекцій
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
