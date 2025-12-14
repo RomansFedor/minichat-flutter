@@ -44,32 +44,22 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Android related
-/android/.gradle
-/android/local.properties
-/android/app/google-services.json
-
-# iOS related
-/ios/Flutter/Flutter.framework
-/ios/Flutter/Flutter.podspec
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/ephemeral
-/ios/Flutter/App.framework
-/ios/Flutter/Flutter.xcframework
-/ios/Pods
-/ios/.symlinks
-/ios/Flutter/.last_build_id
-/ios/.generated
-/ios/Flutter/Flutter-Debug.xcconfig
-/ios/Flutter/Flutter-Release.xcconfig
-
-# Keys & Certificates
-*.p12
-*.key
-*.jks
-*.keystore
-*_key.json
-*_keys.json
-
 # Firebase
-/firebase_options.dart
+**/google-services.json
+!android/app/google-services.json
+**/GoogleService-Info.plist
+firebase_options.dart
+
+# Local configuration
+**/local.properties
+**/.gradle/
+**/gradle-wrapper.jar
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# CI/CD
+.bitrise.yml
+bitrise_secrets.yml

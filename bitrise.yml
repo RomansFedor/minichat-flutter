@@ -16,52 +16,119 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
+    - cache-pull@2: {}
     - flutter-installer@0:
         inputs:
-        - channel: "stable"
+        - channel: "beta"
         - is_update: "true"
     - script@1:
-        title: "Verify Flutter/Dart versions"
-        is_always_run: true
+        title: "Verify Flutter/Dart versions (requires Dart 3.9.2+)"
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=== Flutter Version ==="
+            echo "=== Ensuring Flutter is on beta channel and up to date ==="
+            flutter channel beta
+            flutter upgrade --force
+            
+            echo "=== Current Flutter and Dart versions ==="
             flutter --version
-            echo "=== Dart Version ==="
             dart --version
+            
             echo "=== Verifying Dart SDK >= 3.9.2 ==="
             DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
             echo "Detected Dart version: $DART_VERSION"
             REQUIRED_VERSION="3.9.2"
-            if [ "$DART_VERSION" != "" ]; then
-              MAJOR=$(echo $DART_VERSION | cut -d. -f1)
-              MINOR=$(echo $DART_VERSION | cut -d. -f2)
-              PATCH=$(echo $DART_VERSION | cut -d. -f3)
-              REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
-              REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
-              REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
-              if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
-                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
-                echo "Attempting to upgrade Flutter..."
-                flutter upgrade --force
-                dart --version
-                exit 1
-              fi
-              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
-            else
-              echo "WARNING: Could not detect Dart version, continuing..."
+            
+            # Parse version numbers
+            MAJOR=$(echo $DART_VERSION | cut -d. -f1)
+            MINOR=$(echo $DART_VERSION | cut -d. -f2)
+            PATCH=$(echo $DART_VERSION | cut -d. -f3)
+            REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
+            REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
+            REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
+            
+            # Check if version is sufficient
+            if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
+              echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
+              echo "Even beta channel doesn't have the required version. Please check Flutter releases."
+              exit 1
             fi
-    - cache-pull@2: {}
+            
+            echo "✓ Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
     - script@1:
-        title: "Get Flutter dependencies"
+        title: "Clean and get Flutter dependencies"
         inputs:
         - content: |
             #!/bin/bash
             set -e
+            echo "=== Cleaning Flutter build cache ==="
             cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            flutter clean || echo "Warning: flutter clean failed, continuing..."
+            echo "=== Getting Flutter dependencies ==="
             flutter pub get
+    - script@1:
+        title: "Create google-services.json from Secret (if needed)"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "========================================"
+            echo "Checking google-services.json"
+            echo "========================================"
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            echo "Current directory: $(pwd)"
+            
+            # Check if file already exists (from repository)
+            if [ -f android/app/google-services.json ]; then
+              echo "✓ google-services.json already exists in repository"
+              echo "File size: $(wc -c < android/app/google-services.json | tr -d ' ') bytes"
+              exit 0
+            fi
+            
+            # Create the directory first
+            mkdir -p android/app
+            echo "✓ Directory android/app created/verified"
+            
+            # Try base64 first, then plain text
+            if [ ! -z "$GOOGLE_SERVICES_JSON_B64" ]; then
+              echo "Using base64 encoded secret..."
+              echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json
+            elif [ ! -z "$GOOGLE_SERVICES_JSON" ]; then
+              echo "Using plain text secret (length: ${#GOOGLE_SERVICES_JSON} chars)..."
+              # Write using printf to handle newlines properly
+              printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            else
+              echo "ERROR: google-services.json not found and neither GOOGLE_SERVICES_JSON nor GOOGLE_SERVICES_JSON_B64 is set!"
+              echo "Please either:"
+              echo "  1. Add google-services.json to repository, OR"
+              echo "  2. Add one of these secrets in Bitrise:"
+              echo "     - GOOGLE_SERVICES_JSON: plain text content"
+              echo "     - GOOGLE_SERVICES_JSON_B64: base64 encoded content"
+              exit 1
+            fi
+            
+            # Verify file was created and is not empty
+            if [ ! -f android/app/google-services.json ]; then
+              echo "ERROR: Failed to create google-services.json"
+              echo "Directory listing:"
+              ls -la android/app/ || echo "Cannot list android/app/"
+              exit 1
+            fi
+            
+            FILE_SIZE=$(stat -f%z android/app/google-services.json 2>/dev/null || stat -c%s android/app/google-services.json 2>/dev/null || wc -c < android/app/google-services.json | tr -d ' ')
+            if [ "$FILE_SIZE" -eq 0 ] || [ -z "$FILE_SIZE" ]; then
+              echo "ERROR: google-services.json is empty or could not determine size"
+              exit 1
+            fi
+            
+            echo "✓ google-services.json created successfully"
+            echo "File: $(pwd)/android/app/google-services.json"
+            echo "Size: $FILE_SIZE bytes"
+            echo "First line: $(head -n 1 android/app/google-services.json)"
+            echo "Verifying JSON is valid..."
+            cat android/app/google-services.json | python3 -m json.tool > /dev/null 2>&1 && echo "✓ JSON is valid" || echo "⚠ Warning: JSON validation failed"
+            echo "========================================"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
@@ -71,10 +138,11 @@ workflows:
         - platform: "android"
         - build_apk: "true"
         - build_appbundle: "false"
+        - build_configuration: "release"
     - firebase-app-distribution@2:
         inputs:
         - firebase_token: "$FIREBASE_TOKEN"
-        - app_path: "$BITRISE_APK_PATH"
+        - app_path: "$BITRISE_FLUTTER_PROJECT_DIR/build/app/outputs/flutter-apk/app-release.apk"
         - groups: "$FIREBASE_GROUPS"
         - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
@@ -88,52 +156,119 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
+    - cache-pull@2: {}
     - flutter-installer@0:
         inputs:
-        - channel: "stable"
+        - channel: "beta"
         - is_update: "true"
     - script@1:
-        title: "Verify Flutter/Dart versions"
-        is_always_run: true
+        title: "Verify Flutter/Dart versions (requires Dart 3.9.2+)"
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=== Flutter Version ==="
+            echo "=== Ensuring Flutter is on beta channel and up to date ==="
+            flutter channel beta
+            flutter upgrade --force
+            
+            echo "=== Current Flutter and Dart versions ==="
             flutter --version
-            echo "=== Dart Version ==="
             dart --version
+            
             echo "=== Verifying Dart SDK >= 3.9.2 ==="
             DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
             echo "Detected Dart version: $DART_VERSION"
             REQUIRED_VERSION="3.9.2"
-            if [ "$DART_VERSION" != "" ]; then
-              MAJOR=$(echo $DART_VERSION | cut -d. -f1)
-              MINOR=$(echo $DART_VERSION | cut -d. -f2)
-              PATCH=$(echo $DART_VERSION | cut -d. -f3)
-              REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
-              REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
-              REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
-              if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
-                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
-                echo "Attempting to upgrade Flutter..."
-                flutter upgrade --force
-                dart --version
-                exit 1
-              fi
-              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
-            else
-              echo "WARNING: Could not detect Dart version, continuing..."
+            
+            # Parse version numbers
+            MAJOR=$(echo $DART_VERSION | cut -d. -f1)
+            MINOR=$(echo $DART_VERSION | cut -d. -f2)
+            PATCH=$(echo $DART_VERSION | cut -d. -f3)
+            REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
+            REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
+            REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
+            
+            # Check if version is sufficient
+            if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
+              echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
+              echo "Even beta channel doesn't have the required version. Please check Flutter releases."
+              exit 1
             fi
-    - cache-pull@2: {}
+            
+            echo "✓ Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
     - script@1:
-        title: "Get Flutter dependencies"
+        title: "Clean and get Flutter dependencies"
         inputs:
         - content: |
             #!/bin/bash
             set -e
+            echo "=== Cleaning Flutter build cache ==="
             cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            flutter clean || echo "Warning: flutter clean failed, continuing..."
+            echo "=== Getting Flutter dependencies ==="
             flutter pub get
+    - script@1:
+        title: "Create google-services.json from Secret (if needed)"
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -e
+            echo "========================================"
+            echo "Checking google-services.json"
+            echo "========================================"
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            echo "Current directory: $(pwd)"
+            
+            # Check if file already exists (from repository)
+            if [ -f android/app/google-services.json ]; then
+              echo "✓ google-services.json already exists in repository"
+              echo "File size: $(wc -c < android/app/google-services.json | tr -d ' ') bytes"
+              exit 0
+            fi
+            
+            # Create the directory first
+            mkdir -p android/app
+            echo "✓ Directory android/app created/verified"
+            
+            # Try base64 first, then plain text
+            if [ ! -z "$GOOGLE_SERVICES_JSON_B64" ]; then
+              echo "Using base64 encoded secret..."
+              echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json
+            elif [ ! -z "$GOOGLE_SERVICES_JSON" ]; then
+              echo "Using plain text secret (length: ${#GOOGLE_SERVICES_JSON} chars)..."
+              # Write using printf to handle newlines properly
+              printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            else
+              echo "ERROR: google-services.json not found and neither GOOGLE_SERVICES_JSON nor GOOGLE_SERVICES_JSON_B64 is set!"
+              echo "Please either:"
+              echo "  1. Add google-services.json to repository, OR"
+              echo "  2. Add one of these secrets in Bitrise:"
+              echo "     - GOOGLE_SERVICES_JSON: plain text content"
+              echo "     - GOOGLE_SERVICES_JSON_B64: base64 encoded content"
+              exit 1
+            fi
+            
+            # Verify file was created and is not empty
+            if [ ! -f android/app/google-services.json ]; then
+              echo "ERROR: Failed to create google-services.json"
+              echo "Directory listing:"
+              ls -la android/app/ || echo "Cannot list android/app/"
+              exit 1
+            fi
+            
+            FILE_SIZE=$(stat -f%z android/app/google-services.json 2>/dev/null || stat -c%s android/app/google-services.json 2>/dev/null || wc -c < android/app/google-services.json | tr -d ' ')
+            if [ "$FILE_SIZE" -eq 0 ] || [ -z "$FILE_SIZE" ]; then
+              echo "ERROR: google-services.json is empty or could not determine size"
+              exit 1
+            fi
+            
+            echo "✓ google-services.json created successfully"
+            echo "File: $(pwd)/android/app/google-services.json"
+            echo "Size: $FILE_SIZE bytes"
+            echo "First line: $(head -n 1 android/app/google-services.json)"
+            echo "Verifying JSON is valid..."
+            cat android/app/google-services.json | python3 -m json.tool > /dev/null 2>&1 && echo "✓ JSON is valid" || echo "⚠ Warning: JSON validation failed"
+            echo "========================================"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
@@ -143,10 +278,11 @@ workflows:
         - platform: "android"
         - build_apk: "true"
         - build_appbundle: "false"
+        - build_configuration: "release"
     - firebase-app-distribution@2:
         inputs:
         - firebase_token: "$FIREBASE_TOKEN"
-        - app_path: "$BITRISE_APK_PATH"
+        - app_path: "$BITRISE_FLUTTER_PROJECT_DIR/build/app/outputs/flutter-apk/app-release.apk"
         - groups: "$FIREBASE_GROUPS"
         - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "626864770589",
+    "project_id": "minichat-5fef6",
+    "storage_bucket": "minichat-5fef6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:626864770589:android:7ceec97f224c2bea6b80f4",
+        "android_client_info": {
+          "package_name": "com.example.chat1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1ASrS60eclBZJa11LNDADKzaGH8mMb5A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:626864770589:android:e17864eb94336bf36b80f4",
+        "android_client_info": {
+          "package_name": "com.example.minichat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1ASrS60eclBZJa11LNDADKzaGH8mMb5A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
