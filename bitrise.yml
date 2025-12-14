@@ -16,20 +16,27 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
+    - cache-pull@2: {}
     - flutter-installer@0:
         inputs:
         - channel: "stable"
         - is_update: "true"
     - script@1:
-        title: "Verify Flutter/Dart versions"
+        title: "Verify and Upgrade Flutter/Dart versions"
         is_always_run: true
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=== Flutter Version ==="
+            echo "=== Initial Flutter Version ==="
             flutter --version
-            echo "=== Dart Version ==="
+            echo "=== Initial Dart Version ==="
+            dart --version
+            echo "=== Upgrading Flutter to latest stable ==="
+            flutter upgrade --force
+            echo "=== After Upgrade - Flutter Version ==="
+            flutter --version
+            echo "=== After Upgrade - Dart Version ==="
             dart --version
             echo "=== Verifying Dart SDK >= 3.9.2 ==="
             DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -43,17 +50,17 @@ workflows:
               REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
               REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
               if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
-                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
-                echo "Attempting to upgrade Flutter..."
-                flutter upgrade --force
-                dart --version
+                echo "ERROR: Dart version $DART_VERSION is still lower than required $REQUIRED_VERSION after upgrade"
                 exit 1
               fi
-              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
+              echo "✓ Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
             else
-              echo "WARNING: Could not detect Dart version, continuing..."
+              echo "ERROR: Could not detect Dart version"
+              exit 1
             fi
-    - cache-pull@2: {}
+            echo "=== Cleaning Flutter build cache ==="
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            flutter clean || echo "Warning: flutter clean failed, continuing..."
     - script@1:
         title: "Get Flutter dependencies"
         inputs:
@@ -71,10 +78,11 @@ workflows:
         - platform: "android"
         - build_apk: "true"
         - build_appbundle: "false"
+        - build_configuration: "release"
     - firebase-app-distribution@2:
         inputs:
         - firebase_token: "$FIREBASE_TOKEN"
-        - app_path: "$BITRISE_APK_PATH"
+        - app_path: "$BITRISE_FLUTTER_PROJECT_DIR/build/app/outputs/flutter-apk/app-release.apk"
         - groups: "$FIREBASE_GROUPS"
         - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
@@ -88,20 +96,27 @@ workflows:
     - install-missing-android-tools@3:
         inputs:
         - gradle_version: "8.0"
+    - cache-pull@2: {}
     - flutter-installer@0:
         inputs:
         - channel: "stable"
         - is_update: "true"
     - script@1:
-        title: "Verify Flutter/Dart versions"
+        title: "Verify and Upgrade Flutter/Dart versions"
         is_always_run: true
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=== Flutter Version ==="
+            echo "=== Initial Flutter Version ==="
             flutter --version
-            echo "=== Dart Version ==="
+            echo "=== Initial Dart Version ==="
+            dart --version
+            echo "=== Upgrading Flutter to latest stable ==="
+            flutter upgrade --force
+            echo "=== After Upgrade - Flutter Version ==="
+            flutter --version
+            echo "=== After Upgrade - Dart Version ==="
             dart --version
             echo "=== Verifying Dart SDK >= 3.9.2 ==="
             DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -115,17 +130,17 @@ workflows:
               REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
               REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
               if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
-                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
-                echo "Attempting to upgrade Flutter..."
-                flutter upgrade --force
-                dart --version
+                echo "ERROR: Dart version $DART_VERSION is still lower than required $REQUIRED_VERSION after upgrade"
                 exit 1
               fi
-              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
+              echo "✓ Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
             else
-              echo "WARNING: Could not detect Dart version, continuing..."
+              echo "ERROR: Could not detect Dart version"
+              exit 1
             fi
-    - cache-pull@2: {}
+            echo "=== Cleaning Flutter build cache ==="
+            cd "$BITRISE_FLUTTER_PROJECT_DIR"
+            flutter clean || echo "Warning: flutter clean failed, continuing..."
     - script@1:
         title: "Get Flutter dependencies"
         inputs:
@@ -143,10 +158,11 @@ workflows:
         - platform: "android"
         - build_apk: "true"
         - build_appbundle: "false"
+        - build_configuration: "release"
     - firebase-app-distribution@2:
         inputs:
         - firebase_token: "$FIREBASE_TOKEN"
-        - app_path: "$BITRISE_APK_PATH"
+        - app_path: "$BITRISE_FLUTTER_PROJECT_DIR/build/app/outputs/flutter-apk/app-release.apk"
         - groups: "$FIREBASE_GROUPS"
         - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
