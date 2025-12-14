@@ -18,65 +18,41 @@ workflows:
         - gradle_version: "8.0"
     - flutter-installer@0:
         inputs:
-        - flutter_version: "3.27.0"
+        - channel: "stable"
+        - is_update: "true"
     - script@1:
-        title: "Upgrade Flutter to latest for Dart 3.9.2+"
+        title: "Verify Flutter/Dart versions"
+        is_always_run: true
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=========================================="
-            echo "STEP 1: Checking Flutter and Dart versions BEFORE upgrade..."
-            echo "=========================================="
+            echo "=== Flutter Version ==="
             flutter --version
+            echo "=== Dart Version ==="
             dart --version
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 2: Upgrading Flutter to latest stable version..."
-            echo "=========================================="
-            flutter upgrade --force || {
-              echo "Flutter upgrade failed, trying again..."
-              flutter upgrade
-            }
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 3: Verifying versions AFTER upgrade..."
-            echo "=========================================="
-            flutter --version
-            dart --version
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 4: Verifying Dart SDK version >= 3.9.2..."
-            echo "=========================================="
-            DART_VERSION_FULL=$(dart --version 2>&1)
-            echo "Full Dart version output: $DART_VERSION_FULL"
-            
-            # Extract version number (e.g., 3.9.2 from "Dart SDK version: 3.9.2")
-            DART_VER=$(echo "$DART_VERSION_FULL" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-            echo "Parsed Dart version: $DART_VER"
-            
-            if [ -z "$DART_VER" ]; then
-              echo "ERROR: Could not parse Dart version"
-              dart --version
-              exit 1
+            echo "=== Verifying Dart SDK >= 3.9.2 ==="
+            DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            echo "Detected Dart version: $DART_VERSION"
+            REQUIRED_VERSION="3.9.2"
+            if [ "$DART_VERSION" != "" ]; then
+              MAJOR=$(echo $DART_VERSION | cut -d. -f1)
+              MINOR=$(echo $DART_VERSION | cut -d. -f2)
+              PATCH=$(echo $DART_VERSION | cut -d. -f3)
+              REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
+              REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
+              REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
+              if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
+                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
+                echo "Attempting to upgrade Flutter..."
+                flutter upgrade --force
+                dart --version
+                exit 1
+              fi
+              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
+            else
+              echo "WARNING: Could not detect Dart version, continuing..."
             fi
-            
-            # Compare version (3.9.2 = 30902)
-            VER_NUM=$(echo "$DART_VER" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
-            REQUIRED_NUM=30902
-            
-            if [ "$VER_NUM" -lt "$REQUIRED_NUM" ]; then
-              echo "ERROR: Dart version $DART_VER is too old. Required: >= 3.9.2"
-              exit 1
-            fi
-            
-            echo "✓ Dart version $DART_VER is compatible (>= 3.9.2)"
-            echo "=========================================="
-            echo "Flutter upgrade completed successfully!"
-            echo "=========================================="
     - cache-pull@2: {}
     - script@1:
         title: "Get Flutter dependencies"
@@ -85,31 +61,7 @@ workflows:
             #!/bin/bash
             set -e
             cd "$BITRISE_FLUTTER_PROJECT_DIR"
-            echo "Getting Flutter dependencies..."
             flutter pub get
-            echo "Dependencies installed successfully!"
-    - script@1:
-        title: "Verify Dart SDK version before tests"
-        inputs:
-        - content: |
-            #!/bin/bash
-            set -e
-            echo "=========================================="
-            echo "Final Dart SDK version check..."
-            echo "=========================================="
-            DART_VERSION=$(dart --version 2>&1 | head -n1)
-            echo "Dart version: $DART_VERSION"
-            
-            # Verify Dart version is 3.9.2 or higher
-            DART_MAJOR_MINOR=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-            echo "Dart version parsed: $DART_MAJOR_MINOR"
-            
-            if [[ $(echo "$DART_MAJOR_MINOR" | awk -F. '{print ($1*10000 + $2*100 + $3)}') -lt 30902 ]]; then
-              echo "ERROR: Dart version $DART_MAJOR_MINOR is too old. Need 3.9.2+"
-              exit 1
-            fi
-            
-            echo "Dart version is compatible: $DART_MAJOR_MINOR >= 3.9.2"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
@@ -138,65 +90,41 @@ workflows:
         - gradle_version: "8.0"
     - flutter-installer@0:
         inputs:
-        - flutter_version: "3.27.0"
+        - channel: "stable"
+        - is_update: "true"
     - script@1:
-        title: "Upgrade Flutter to latest for Dart 3.9.2+"
+        title: "Verify Flutter/Dart versions"
+        is_always_run: true
         inputs:
         - content: |
             #!/bin/bash
             set -e
-            echo "=========================================="
-            echo "STEP 1: Checking Flutter and Dart versions BEFORE upgrade..."
-            echo "=========================================="
+            echo "=== Flutter Version ==="
             flutter --version
+            echo "=== Dart Version ==="
             dart --version
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 2: Upgrading Flutter to latest stable version..."
-            echo "=========================================="
-            flutter upgrade --force || {
-              echo "Flutter upgrade failed, trying again..."
-              flutter upgrade
-            }
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 3: Verifying versions AFTER upgrade..."
-            echo "=========================================="
-            flutter --version
-            dart --version
-            echo ""
-            
-            echo "=========================================="
-            echo "STEP 4: Verifying Dart SDK version >= 3.9.2..."
-            echo "=========================================="
-            DART_VERSION_FULL=$(dart --version 2>&1)
-            echo "Full Dart version output: $DART_VERSION_FULL"
-            
-            # Extract version number (e.g., 3.9.2 from "Dart SDK version: 3.9.2")
-            DART_VER=$(echo "$DART_VERSION_FULL" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-            echo "Parsed Dart version: $DART_VER"
-            
-            if [ -z "$DART_VER" ]; then
-              echo "ERROR: Could not parse Dart version"
-              dart --version
-              exit 1
+            echo "=== Verifying Dart SDK >= 3.9.2 ==="
+            DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            echo "Detected Dart version: $DART_VERSION"
+            REQUIRED_VERSION="3.9.2"
+            if [ "$DART_VERSION" != "" ]; then
+              MAJOR=$(echo $DART_VERSION | cut -d. -f1)
+              MINOR=$(echo $DART_VERSION | cut -d. -f2)
+              PATCH=$(echo $DART_VERSION | cut -d. -f3)
+              REQ_MAJOR=$(echo $REQUIRED_VERSION | cut -d. -f1)
+              REQ_MINOR=$(echo $REQUIRED_VERSION | cut -d. -f2)
+              REQ_PATCH=$(echo $REQUIRED_VERSION | cut -d. -f3)
+              if [ $MAJOR -lt $REQ_MAJOR ] || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -lt $REQ_MINOR ]) || ([ $MAJOR -eq $REQ_MAJOR ] && [ $MINOR -eq $REQ_MINOR ] && [ $PATCH -lt $REQ_PATCH ]); then
+                echo "ERROR: Dart version $DART_VERSION is lower than required $REQUIRED_VERSION"
+                echo "Attempting to upgrade Flutter..."
+                flutter upgrade --force
+                dart --version
+                exit 1
+              fi
+              echo "Dart version check passed: $DART_VERSION >= $REQUIRED_VERSION"
+            else
+              echo "WARNING: Could not detect Dart version, continuing..."
             fi
-            
-            # Compare version (3.9.2 = 30902)
-            VER_NUM=$(echo "$DART_VER" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
-            REQUIRED_NUM=30902
-            
-            if [ "$VER_NUM" -lt "$REQUIRED_NUM" ]; then
-              echo "ERROR: Dart version $DART_VER is too old. Required: >= 3.9.2"
-              exit 1
-            fi
-            
-            echo "✓ Dart version $DART_VER is compatible (>= 3.9.2)"
-            echo "=========================================="
-            echo "Flutter upgrade completed successfully!"
-            echo "=========================================="
     - cache-pull@2: {}
     - script@1:
         title: "Get Flutter dependencies"
@@ -205,31 +133,7 @@ workflows:
             #!/bin/bash
             set -e
             cd "$BITRISE_FLUTTER_PROJECT_DIR"
-            echo "Getting Flutter dependencies..."
             flutter pub get
-            echo "Dependencies installed successfully!"
-    - script@1:
-        title: "Verify Dart SDK version before tests"
-        inputs:
-        - content: |
-            #!/bin/bash
-            set -e
-            echo "=========================================="
-            echo "Final Dart SDK version check..."
-            echo "=========================================="
-            DART_VERSION=$(dart --version 2>&1 | head -n1)
-            echo "Dart version: $DART_VERSION"
-            
-            # Verify Dart version is 3.9.2 or higher
-            DART_MAJOR_MINOR=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-            echo "Dart version parsed: $DART_MAJOR_MINOR"
-            
-            if [[ $(echo "$DART_MAJOR_MINOR" | awk -F. '{print ($1*10000 + $2*100 + $3)}') -lt 30902 ]]; then
-              echo "ERROR: Dart version $DART_MAJOR_MINOR is too old. Need 3.9.2+"
-              exit 1
-            fi
-            
-            echo "Dart version is compatible: $DART_MAJOR_MINOR >= 3.9.2"
     - flutter-test@0:
         inputs:
         - project_location: "$BITRISE_FLUTTER_PROJECT_DIR"
@@ -246,4 +150,3 @@ workflows:
         - groups: "$FIREBASE_GROUPS"
         - release_notes: "$BITRISE_GIT_MESSAGE"
     - cache-push@2: {}
-

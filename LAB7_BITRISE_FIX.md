@@ -27,29 +27,33 @@ Because chat1 requires SDK version ^3.9.2, version solving failed.
 **Стало:**
 ```yaml
 - flutter-installer@0:
+    inputs:
+    - channel: "stable"
+    - is_update: "true"
 - script@1:
-    title: "Ensure Flutter/Dart version compatibility"
+    title: "Verify Flutter/Dart versions"
+    is_always_run: true
     inputs:
     - content: |
         #!/bin/bash
         set -e
-        echo "Checking Flutter and Dart versions..."
+        echo "=== Flutter Version ==="
         flutter --version
+        echo "=== Dart Version ==="
         dart --version
-        
-        # Update Flutter to latest stable to ensure Dart 3.9.2+ compatibility
-        echo "Upgrading Flutter to latest stable version..."
-        flutter upgrade --force
-        flutter --version
-        dart --version
-        echo "Flutter upgrade completed"
+        echo "=== Verifying Dart SDK >= 3.9.2 ==="
+        DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        echo "Detected Dart version: $DART_VERSION"
+        # Перевірка версії та автоматичне оновлення, якщо потрібно
+        ...
 ```
 
-**Що робить скрипт:**
-1. Виводить поточні версії Flutter та Dart
-2. Автоматично оновлює Flutter до останньої стабільної версії (яка містить Dart 3.9.2+)
-3. Перевіряє версії після оновлення
-4. Гарантує сумісність з вимогами проєкту
+**Що робить конфігурація:**
+1. `flutter-installer` з `channel: stable` та `is_update: true` встановлює останню стабільну версію Flutter
+2. Скрипт перевіряє версії Flutter та Dart
+3. Автоматично перевіряє, чи Dart SDK >= 3.9.2
+4. Якщо версія нижча, спробує оновити Flutter та виведе помилку
+5. Гарантує сумісність з вимогами проєкту
 
 **Чому `flutter upgrade --force`:**
 - Гарантує останню стабільну версію Flutter
@@ -148,6 +152,53 @@ Because chat1 requires SDK version ^3.9.2, version solving failed.
 
 ---
 
+## Важливі примітки
+
+### Проблема з порядком виконання
+
+Bitrise може автоматично додавати кроки (наприклад, "Restore Dart Cache"), які не вказані в `bitrise.yml`. Тому важливо:
+
+1. ✅ Оновлення Flutter має відбуватися ПІСЛЯ `flutter-installer`
+2. ✅ Кеш має відновлюватися ПІСЛЯ оновлення Flutter
+3. ✅ Перевірка версії Dart має відбуватися ПЕРЕД тестами
+
+### Поточний порядок кроків:
+
+```
+1. flutter-installer@0 (встановлення останньої стабільної з channel: stable, is_update: true)
+2. script: Verify Flutter/Dart versions (перевірка версій та сумісності)
+3. cache-pull (відновлення кешу ПІСЛЯ встановлення/оновлення)
+4. script: Get Flutter dependencies (flutter pub get)
+5. flutter-test (тести з правильною версією)
+```
+
+### Якщо проблема залишається:
+
+1. **Очистіть кеш в Bitrise:**
+   - Перейдіть в Settings → Caches
+   - Видаліть всі кеші для проєкту
+   - Запустіть нову збірку
+
+2. **Перевірте логи:**
+   - Знайдіть вивід зі скрипта "Verify Flutter/Dart versions"
+   - Переконайтеся, що Flutter встановлено з правильного каналу (stable)
+   - Перевірте версію Dart (має бути >= 3.9.2)
+   - Якщо версія нижча, скрипт спробує оновити Flutter автоматично
+
+3. **Альтернатива - вказати конкретну версію:**
+   ```yaml
+   - flutter-installer@0:
+       inputs:
+       - flutter_version: "3.27.0"  # або інша версія з Dart 3.9.2+
+   ```
+
+---
+
 **Дата виправлення:** 2025  
-**Версія:** 1.1
+**Версія:** 1.4
+
+**Останні зміни:**
+- Використання `channel: stable` та `is_update: true` в flutter-installer для автоматичного встановлення останньої стабільної версії
+- Додано автоматичну перевірку версії Dart з fallback на оновлення Flutter
+- Покращено логування та діагностику версій
 
