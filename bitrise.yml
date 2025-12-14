@@ -17,8 +17,10 @@ workflows:
         inputs:
         - gradle_version: "8.0"
     - flutter-installer@0:
+        inputs:
+        - flutter_version: "3.27.0"
     - script@1:
-        title: "Ensure Flutter/Dart version compatibility"
+        title: "Upgrade Flutter to latest for Dart 3.9.2+"
         inputs:
         - content: |
             #!/bin/bash
@@ -135,8 +137,10 @@ workflows:
         inputs:
         - gradle_version: "8.0"
     - flutter-installer@0:
+        inputs:
+        - flutter_version: "3.27.0"
     - script@1:
-        title: "Ensure Flutter/Dart version compatibility"
+        title: "Upgrade Flutter to latest for Dart 3.9.2+"
         inputs:
         - content: |
             #!/bin/bash
